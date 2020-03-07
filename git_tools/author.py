@@ -1,7 +1,5 @@
 import time
 
-from git_tools.utils import PrintableObject
-
 
 class RepoAuthor(object):
     def __init__(self, name):

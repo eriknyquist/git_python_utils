@@ -1,16 +1,17 @@
+import os
 
-class PrintableObject(object):
-    def __str__(self):
-        ret = "%s(" % self.__class__.__name__
-        keys = list(self.__dict__.keys())
+from git_tools.git_repo import GitRepo
 
-        for i in range(len(keys)):
-            ret += "%s=%s" % (keys[i], self.__dict__[keys[i]])
-            if i < (len(keys) - 1):
-                ret += ", "
 
-        return ret
+def open_git_repo(path):
+    if not os.path.isdir(path):
+        print("Error accessing repo at path %s: no such directory" % path)
+        return None
 
-    def __repr__(self):
-        return self.__str__()
+    try:
+        ret = GitRepo(path)
+    except Exception as e:
+        print("Error accessing repo at path %s: %s" % (path, str(e)))
+        return None
 
+    return ret

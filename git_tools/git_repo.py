@@ -1,6 +1,6 @@
+import os
 from git import Repo
 
-from git_tools.utils import PrintableObject
 from git_tools.author import RepoAuthor
 
 
@@ -13,9 +13,17 @@ class GitRepo(Repo):
     def file_list(self):
         return [e[0] for e in self.index.entries]
 
-    def _repo_author_info(self):
+    def _repo_author_info(self, file_whitelist, file_blacklist):
         _authors = {}
         for fn in self.file_list():
+
+            ext = os.path.splitext(fn)[1]
+            if file_whitelist and (ext not in file_whitelist):
+                continue
+
+            if file_blacklist and (ext in file_blacklist):
+                continue
+
             blame_results = self.blame(None, fn)
             for result in blame_results:
                 commit, lines = result
@@ -40,12 +48,13 @@ class GitRepo(Repo):
 
         return _authors
 
-    def author_stats(self, whitelist=[], blacklist=[]):
-        authors = self._repo_author_info()
-        if blacklist:
+    def author_stats(self, author_whitelist=[], author_blacklist=[],
+                     file_whitelist=[], file_blacklist=[]):
+        authors = self._repo_author_info(file_whitelist, file_blacklist)
+        if author_blacklist:
             return [authors[a] for a in authors if a not in blacklist]
 
-        if whitelist:
+        if author_whitelist:
             return [authors[a] for a in authors if a in whitelist]
 
-        return authors
+        return list(authors.values())
