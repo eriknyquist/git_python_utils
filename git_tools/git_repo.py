@@ -58,3 +58,34 @@ class GitRepo(Repo):
             return [authors[a] for a in authors if a in whitelist]
 
         return list(authors.values())
+
+    def _latest_tag_info(self):
+        taghashes = {t.commit.hexsha: t for t in self.tags}
+
+        commits_since = 0
+        for commit in self.iter_commits(None):
+            if commit.hexsha in taghashes:
+                tag = taghashes[commit.hexsha]
+                return tag.name, commits_since
+
+            commits_since += 1
+
+        return None, commits_since
+
+    def generate_version_string(self):
+        tagname, commits_since = self._latest_tag_info()
+        if tagname is None:
+            ret = "v0.0.1"
+        else:
+            ret = tagname
+
+        if (tagname is not None) and (commits_since > 0):
+            ret += ".%d" % commits_since
+
+        if self.is_dirty():
+            ret += "-dev"
+
+        if tagname is None:
+            ret += "-%s" % (self.head.commit.hexsha[:8])
+
+        return ret
