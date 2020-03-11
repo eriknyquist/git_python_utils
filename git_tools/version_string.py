@@ -60,6 +60,11 @@ Available built-in keywords
 
     * dir          : Produces the repo's root directory name.
 
+    * timestamp    : Produces a timestamp in seconds since  the UNIX epoch
+
+    * datetime     : Produces a human-readable date/time in "YYYYMMDD-HHMMSS"
+                     format
+
     * %            : Indicates the remaining characters in the format token
                      should be copied as-is into the version string. Use this
                      to insert literal strings into the version string, e.g.

@@ -59,6 +59,7 @@ class VersionInfo(object):
 
         return ret
 
+
 class GitRepo(Repo):
     def __init__(self, *args, **kwargs):
         super(GitRepo, self).__init__(*args, **kwargs)
@@ -136,6 +137,8 @@ class GitRepo(Repo):
         if tagname is None:
             tagname = "v0.0.1"
 
-        return VersionInfo(tagname, self.active_branch.name, commits_since,
-                           self.is_dirty(), self.head.commit.hexsha[:8],
-                           os.path.basename(self.working_dir)).format(fmt)
+        v = VersionInfo(tagname, self.active_branch.name, commits_since,
+                        self.is_dirty(), self.head.commit.hexsha[:8],
+                        os.path.basename(self.working_dir))
+
+        return v.format(fmt)

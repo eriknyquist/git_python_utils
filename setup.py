@@ -4,9 +4,13 @@ from setuptools import setup
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = os.path.join(HERE, "README.rst")
+REQS = os.path.join(HERE, "requirements.txt")
 
-with open(README, 'r') as f:
-    long_description = f.read()
+with open(README, 'r') as fh:
+    long_description = fh.read()
+
+with open(REQS, 'r') as fh:
+    requirements = fh.readlines()
 
 setup(
     name='git_tools',
@@ -19,10 +23,11 @@ setup(
     author_email='eknyquist@gmail.com',
     license='Apache 2.0',
     packages=['git_tools'],
+    install_requires=requirements,
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'git-author-stats=git_tools.author_stats:main'
+            'git-author-stats=git_tools.author_stats:main',
             'git-version-string=git_tools.version_string:main'
         ]
     }
