@@ -1,8 +1,63 @@
+import time
 import os
 from git import Repo
 
 from git_tools.author import RepoAuthor
 
+default_fmt = [".", "tag", "commits", "-", "dirty", "incsha"]
+
+
+class VersionInfo(object):
+    dirty_tag = "dirty"
+    literal_char = "%"
+
+    def __init__(self, tag, branch, commits_since, is_dirty, sha, working_dir):
+        self.tag = tag
+        self.branch = branch
+        self.commits = commits_since
+        self.is_dirty = is_dirty
+        self.sha = sha
+        self.dir = working_dir
+
+        self.sep = "."
+
+        self._fmt_args = {
+            "tag": lambda x: x.tag,
+            "commits": lambda x: str(x.commits),
+            "inccommits": lambda x: str(x.commits) if x.commits else None,
+            "dirty": lambda x: x.__class__.dirty_tag if x.is_dirty else None,
+            "sha": lambda x: x.sha,
+            "incsha": lambda x: x.sha if not x.tag else None,
+            "branch": lambda x: x.branch,
+            "dir": lambda x: x.dir,
+            "timestamp": lambda x: str(int(time.time())),
+            "datetime": lambda x: time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+        }
+
+    def format(self, fmt):
+        ret = ""
+
+        for i in range(len(fmt)):
+            tok = fmt[i].strip()
+
+            if (len(tok) > 0) and (tok[0] == self.__class__.literal_char):
+                field = tok[1:]
+            else:
+                if tok not in self._fmt_args:
+                    # New separator set
+                    self.sep = tok
+                    continue
+
+                field = self._fmt_args[tok](self)
+                if not field:
+                    continue
+
+            if ret:
+                ret += self.sep
+
+            ret += field
+
+        return ret
 
 class GitRepo(Repo):
     def __init__(self, *args, **kwargs):
@@ -72,20 +127,15 @@ class GitRepo(Repo):
 
         return None, commits_since
 
-    def generate_version_string(self):
+    def generate_version_string(self, fmt=default_fmt, dirty_tag="dirty",
+                                literal_char="%"):
+        VersionInfo.dirty_tag = dirty_tag
+        VersionInfo.literal_char = literal_char
+
         tagname, commits_since = self._latest_tag_info()
         if tagname is None:
-            ret = "v0.0.1"
-        else:
-            ret = tagname
+            tagname = "v0.0.1"
 
-        if (tagname is not None) and (commits_since > 0):
-            ret += ".%d" % commits_since
-
-        if self.is_dirty():
-            ret += "-dev"
-
-        if tagname is None:
-            ret += "-%s" % (self.head.commit.hexsha[:8])
-
-        return ret
+        return VersionInfo(tagname, self.active_branch.name, commits_since,
+                           self.is_dirty(), self.head.commit.hexsha[:8],
+                           os.path.basename(self.working_dir)).format(fmt)
