@@ -36,14 +36,16 @@ Available built-in keywords
     * tag          : Produces the name of the most recent tag on the active branch.
                      "v0.0.1" is used if no tags are present on the active branch.
 
-    * commits      : Produces the number of commits since the most recent tag.
+    * since        : Produces the number of commits since the most recent tag.
                      Produces the total number of commits if no tags are
                      present on the active branch.
 
-    * inccommits   : Produces the number of commits since the most recent tag.
+    * nsince       : Produces the number of commits since the most recent tag.
                      Produces the total number of commits if no tags are
                      present on the active branch. Produces no output in the version
                      string if the resulting commit count is 0.
+
+    * commits      : Produces the total number of commits on the active branch
 
     * dirty        : Produces the defined dirty tag (default is "dirty") if the
                      repo is dirty, otherwise produces no output in the version

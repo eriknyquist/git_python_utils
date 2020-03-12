@@ -11,7 +11,9 @@ class VersionInfo(object):
     dirty_tag = "dirty"
     literal_char = "%"
 
-    def __init__(self, tag, branch, commits_since, is_dirty, sha, working_dir):
+    def __init__(self, repo, tag, branch, commits_since, is_dirty,
+                 sha, working_dir):
+        self.repo = repo
         self.tag = tag
         self.branch = branch
         self.commits = commits_since
@@ -23,8 +25,9 @@ class VersionInfo(object):
 
         self._fmt_args = {
             "tag": lambda x: x.tag,
-            "commits": lambda x: str(x.commits),
-            "inccommits": lambda x: str(x.commits) if x.commits else None,
+            "since": lambda x: str(x.commits),
+            "nsince": lambda x: str(x.commits) if x.commits else None,
+            "commits": lambda x: str(x.repo.git.rev_list('--count', 'HEAD')),
             "dirty": lambda x: x.__class__.dirty_tag if x.is_dirty else None,
             "sha": lambda x: x.sha,
             "incsha": lambda x: x.sha if not x.tag else None,
@@ -137,7 +140,7 @@ class GitRepo(Repo):
         if tagname is None:
             tagname = "v0.0.1"
 
-        v = VersionInfo(tagname, self.active_branch.name, commits_since,
+        v = VersionInfo(self, tagname, self.active_branch.name, commits_since,
                         self.is_dirty(), self.head.commit.hexsha[:8],
                         os.path.basename(self.working_dir))
 
