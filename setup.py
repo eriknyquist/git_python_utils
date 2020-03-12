@@ -1,6 +1,12 @@
 import unittest
 import os
+import sys
 from setuptools import setup
+
+package_name = "git_tools"
+
+sys.path.insert(0, package_name)
+import version
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = os.path.join(HERE, "README.rst")
@@ -12,9 +18,13 @@ with open(README, 'r') as fh:
 with open(REQS, 'r') as fh:
     requirements = fh.readlines()
 
+version_str = version.version.strip()
+if version_str[0] in ['v', 'V']:
+    version_str = version_str[1:]
+
 setup(
-    name='git_tools',
-    version='0.1',
+    name=package_name,
+    version=version_str,
     description=('A collection of command-line utilities for interacting with '
                  'git repositories'),
     long_description=long_description,

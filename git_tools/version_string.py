@@ -33,8 +33,8 @@ definition is seen. The default separator is ".".
 Available built-in keywords
 ---------------------------
 
-    * tag          : Produces the name of the most recent tag on the active branch. "v0.0.1"
-                     is used if no tags are present on the active branch.
+    * tag          : Produces the name of the most recent tag on the active branch.
+                     "v0.0.1" is used if no tags are present on the active branch.
 
     * commits      : Produces the number of commits since the most recent tag.
                      Produces the total number of commits if no tags are
@@ -80,6 +80,7 @@ _,tag,commits,branch,+,sha,%testing
 This would generate a version string in the following format:
 
 <tag>_<commits>_<branch>+<sha>+testing
+\n 
 ''')
 
 def main():
