@@ -37,6 +37,7 @@ setup(
     include_package_data=True,
     entry_points={
         'console_scripts': [
+            'git-changelog=git_tools.changelog:main',
             'git-author-stats=git_tools.author_stats:main',
             'git-version-string=git_tools.version_string:main'
         ]

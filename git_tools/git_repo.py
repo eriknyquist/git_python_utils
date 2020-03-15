@@ -200,17 +200,16 @@ class CommitChecker(object):
 class StartCommitChecker(CommitChecker):
     def __init__(self, *args, **kwargs):
         super(StartCommitChecker, self).__init__(*args, **kwargs)
-        self.matched_tag = None
 
-    def _do_check(self, c):
+    def _default_check(self, c):
         if c.hexsha in self.repo.taghashes:
-            self.matched_tag = self.repo.taghashes[c.hexsha].name
+            self._str = self.repo.taghashes[c.hexsha].name
             return True
 
         return False
 
     def set_default_checker(self):
-        self.checker = lambda c: self._do_check(c)
+        self.checker = lambda c: self._default_check(c)
         self._str = "the next earliest tag"
 
 
@@ -336,6 +335,6 @@ class GitRepo(Repo):
             raise RuntimeError("can't find end of range '%s'" % end)
 
         changelog.end = str(end)
-        changelog.start = start.matched_tag if start.matched_tag else str(start)
+        changelog.start = str(start)
 
         return changelog
