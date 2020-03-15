@@ -93,12 +93,21 @@ class ChangeLogCommitInfo(object):
 class ChangeLog(object):
     def __init__(self):
         self.commits = []
+        self.start = None
+        self.end = None
+
+    @property
+    def title(self):
+        if None in [self.start, self.end]:
+            return ""
+
+        return "# Changes from %s to %s" % (self.start, self.end)
 
     def add_commit(self, commit):
         self.commits.append(ChangeLogCommitInfo(commit))
 
     def __str__(self):
-        ret = []
+        ret = [self.title]
         date = None
 
         for c in self.commits:
@@ -116,13 +125,94 @@ class ChangeLog(object):
         return self.__str__()
 
 
+class CommitChecker(object):
+    def __init__(self, repo, tag, date):
+        self.checker = None
+        self.repo = repo
+        self._str = ""
+
+        if tag is not None:
+            if tag not in self.repo.tagnames:
+                raise RuntimeError("tag '%s' not found in repo %s" %
+                                   (tag, os.path.basename(repo.working_dir)))
+
+            self.checker = lambda c: c.hexsha == self.repo.tagnames[tag].commit.hexhsha
+            self._str = tag
+
+        elif date is not None:
+            self.dt, self.secs, fmt = self.parse_datetime(date)
+            self.checker = lambda c: c.committed_date <= self.secs
+            self._str = self.dt.strftime(fmt)
+
+        else:
+            self.set_default_checker()
+
+    def parse_datetime(self, datestr):
+        parsed = None
+        chosen_fmt = None
+
+        for fmt, _ in datetime_fmts:
+            try:
+                dt = datetime.strptime(datestr, fmt)
+            except ValueError:
+                pass
+            else:
+                parsed = dt
+                chosen_fmt = fmt
+                break
+
+        if parsed is None:
+            raise RuntimeError("unsupported date/time format: %s" % datestr)
+
+        # Convert naive DT object to seconds since UNIX epoch
+        secs = int((parsed - datetime(1970, 1, 1)) / timedelta(seconds=1))\
+
+        return parsed, secs, chosen_fmt
+
+    def __str__(self):
+        return self._str
+
+    def __repr__(self):
+        return self._str
+
+    def set_default_checker(self):
+        raise NotImplementedError()
+
+
+class StartCommitChecker(CommitChecker):
+    def __init__(self, *args, **kwargs):
+        super(StartCommitChecker, self).__init__(*args, **kwargs)
+        self.matched_tag = None
+
+    def _do_check(self, c):
+        if c.hexsha in self.repo.taghashes:
+            self.matched_tag = self.repo.taghashes[c.hexsha].name
+            return True
+
+        return False
+
+    def set_default_checker(self):
+        self.checker = lambda c: self._do_check(c)
+        self._str = "the next earliest tag"
+
+
+class EndCommitChecker(CommitChecker):
+    def set_default_checker(self):
+        self.checker = lambda c: c.hexsha == self.repo.head.commit.hexsha
+
+        if self.repo.head.commit.hexsha in self.repo.taghashes:
+            self._str = self.repo.taghashes[self.repo.head.commit.hexsha].name
+        else:
+            self._str = "HEAD"
+
+
 class GitRepo(Repo):
     def __init__(self, *args, **kwargs):
         super(GitRepo, self).__init__(*args, **kwargs)
         self._authors = {}
         self._ignore_authors = ['Not Committed Yet']
-        self._tagnames = {t.name: t for t in self.tags}
-        self._taghashes = {t.commit.hexsha: t for t in self.tags}
+        self.tagnames = {t.name: t for t in self.tags}
+        self.taghashes = {t.commit.hexsha: t for t in self.tags}
 
     def file_list(self):
         return [e[0] for e in self.index.entries]
@@ -176,8 +266,8 @@ class GitRepo(Repo):
     def _latest_tag_info(self):
         commits_since = 0
         for commit in self.iter_commits(None):
-            if commit.hexsha in self._taghashes:
-                tag = self._taghashes[commit.hexsha]
+            if commit.hexsha in self.taghashes:
+                tag = self.taghashes[commit.hexsha]
                 return tag.name, commits_since
 
             commits_since += 1
@@ -199,73 +289,25 @@ class GitRepo(Repo):
 
         return v.format(fmt)
 
-    def _parse_datetime(self, datestr):
-        parsed = None
-
-        for fmt, _ in datetime_fmts:
-            try:
-                dt = datetime.strptime(datestr, fmt)
-            except ValueError:
-                pass
-            else:
-                parsed = dt
-                break
-
-        if parsed is None:
-            raise RuntimeError("unsupported date/time format: %s" % datestr)
-
-        # Convert naive DT object to seconds since UNIX epoch
-        return int((parsed - datetime(1970, 1, 1)) / timedelta(seconds=1))
-
-    def _iter_commits_in_date_range(self, start_date, end_date):
-        start_secs = self._parse_datetime(start_date)
-        end_secs = self._parse_datetime(end_date)
-
-        seen_end = False
-        for commit in self.iter_commits(None):
-            if commit.committed_date <= end_secs:
-                seen_end = True
-
-            if commit.committed_date <= start_secs:
-                break
-
-            yield commit
-
-    def _get_commit_checker(self, tag, date):
-        if tag is not None:
-            if tag not in self._tagnames:
-                raise RuntimeError("tag '%s' not found in repo %s" %
-                                   (tag, os.path.basename(self.working_dir)))
-
-            return lambda c: c.hexsha == self._tagnames[tag].commit.hexhsha
-
-        elif date is not None:
-            secs = self._parse_datetime(date)
-            return lambda c: c.committed_date <= secs
-
-        return None
-
     def changelog(self, start_tag=None, end_tag=None, start_date=None, end_date=None):
-        end_checker = self._get_commit_checker(end_tag, end_date)
-        if end_checker is None:
-            end_checker = lambda c: c.hexsha == self.head.commit.hexsha
-
-        start_checker = self._get_commit_checker(start_tag, start_date)
-        if start_checker is None:
-            start_checker = lambda c: c.hexsha in self._taghashes
+        start = StartCommitChecker(self, start_tag, start_date)
+        end = EndCommitChecker(self, end_tag, end_date)
 
         changelog = ChangeLog()
 
         seen_end = False
         for commit in self.iter_commits(None):
             if seen_end:
-                if start_checker(commit):
+                if start.checker(commit):
                     break
 
                 changelog.add_commit(commit)
 
-            if (not seen_end) and end_checker(commit):
+            if (not seen_end) and end.checker(commit):
                 seen_end = True
                 changelog.add_commit(commit)
+
+        changelog.end = str(end)
+        changelog.start = start.matched_tag if start.matched_tag else str(start)
 
         return changelog
