@@ -1,12 +1,17 @@
 import datetime
 import time
 import os
-from git import Repo
 from datetime import datetime, timedelta
+
+from git import Repo
+from git.exc import GitCommandError
 
 from git_tools.author import RepoAuthor
 
+
 default_version_fmt = [".", "tag", "commits", "-", "dirty", "incsha"]
+
+commit_sha_lens = [8, 40]
 
 datetime_fmts = [
     ('%Y/%m/%d', 'YYYY/MM/DD'),
@@ -126,9 +131,10 @@ class ChangeLog(object):
 
 
 class CommitChecker(object):
-    def __init__(self, repo, tag, date):
+    def __init__(self, repo, tag, date, sha):
         self.checker = None
         self.repo = repo
+        self.sha = sha
         self._str = ""
 
         if tag is not None:
@@ -138,6 +144,18 @@ class CommitChecker(object):
 
             self.checker = lambda c: c.hexsha == self.repo.tagnames[tag].commit.hexhsha
             self._str = tag
+
+        elif sha is not None:
+            if len(sha) not in commit_sha_lens:
+                raise RuntimeError("invalid length for commit SHA '%s'" % sha)
+
+            try:
+                repo.git.rev_parse('--verify', sha)
+            except GitCommandError:
+                raise RuntimeError("invalid commit SHA '%s'" % sha)
+
+            self.checker = lambda c: c.hexsha[:8] == self.sha[:8]
+            self._str = self.sha[:8]
 
         elif date is not None:
             self.dt, self.secs, fmt = self.parse_datetime(date)
@@ -289,16 +307,20 @@ class GitRepo(Repo):
 
         return v.format(fmt)
 
-    def changelog(self, start_tag=None, end_tag=None, start_date=None, end_date=None):
-        start = StartCommitChecker(self, start_tag, start_date)
-        end = EndCommitChecker(self, end_tag, end_date)
+    def changelog(self, start_tag=None, end_tag=None, start_date=None,
+                  end_date=None, start_sha=None, end_sha=None):
+        start = StartCommitChecker(self, start_tag, start_date, start_sha)
+        end = EndCommitChecker(self, end_tag, end_date, end_sha)
 
         changelog = ChangeLog()
 
         seen_end = False
+        seen_start = False
+
         for commit in self.iter_commits(None):
             if seen_end:
                 if start.checker(commit):
+                    seen_start = True
                     break
 
                 changelog.add_commit(commit)
@@ -306,6 +328,12 @@ class GitRepo(Repo):
             if (not seen_end) and end.checker(commit):
                 seen_end = True
                 changelog.add_commit(commit)
+
+        if not seen_start:
+            raise RuntimeError("can't find start of range '%s'" % start)
+
+        if not seen_end:
+            raise RuntimeError("can't find end of range '%s'" % end)
 
         changelog.end = str(end)
         changelog.start = start.matched_tag if start.matched_tag else str(start)
