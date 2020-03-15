@@ -1,10 +1,19 @@
+import datetime
 import time
 import os
 from git import Repo
+from datetime import datetime, timedelta
 
 from git_tools.author import RepoAuthor
 
-default_fmt = [".", "tag", "commits", "-", "dirty", "incsha"]
+default_version_fmt = [".", "tag", "commits", "-", "dirty", "incsha"]
+
+datetime_fmts = [
+    ('%Y/%m/%d', 'YYYY/MM/DD'),
+    ('%Y-%m-%d', 'YYYY-MM-DD'),
+    ('%Y/%m/%d %H:M', 'YYYY/MM/DD HH:MM'),
+    ('%Y-%m-%d_%H-M', 'YYYY-MM-DD_HH-MM')
+]
 
 
 class VersionInfo(object):
@@ -61,6 +70,50 @@ class VersionInfo(object):
             ret += field
 
         return ret
+
+
+class ChangeLogCommitInfo(object):
+    def __init__(self, commit):
+        self.utc_seconds = commit.committed_date
+        self.utc_offset = commit.committer_tz_offset
+        self.sha = commit.hexsha
+        self.author = commit.author
+        self.message = commit.message
+
+    def commit_day(self):
+        return datetime.fromtimestamp(self.utc_seconds).strftime("%d %b %Y")
+
+    def __str__(self):
+        return "%s  %s" % (self.sha[:8], self.message.split("\n")[0])
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class ChangeLog(object):
+    def __init__(self):
+        self.commits = []
+
+    def add_commit(self, commit):
+        self.commits.append(ChangeLogCommitInfo(commit))
+
+    def __str__(self):
+        ret = []
+        date = None
+
+        for c in self.commits:
+            commit_day = c.commit_day()
+            if commit_day != date:
+                date = commit_day
+                ret.append("")
+                ret.append("# Commits on %s" % date)
+
+            ret.append(str(c))
+
+        return '\n'.join(ret).strip()
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class GitRepo(Repo):
@@ -131,7 +184,7 @@ class GitRepo(Repo):
 
         return None, commits_since
 
-    def generate_version_string(self, fmt=default_fmt, dirty_tag="dirty",
+    def generate_version_string(self, fmt=default_version_fmt, dirty_tag="dirty",
                                 literal_char="%"):
         VersionInfo.dirty_tag = dirty_tag
         VersionInfo.literal_char = literal_char
@@ -145,3 +198,87 @@ class GitRepo(Repo):
                         os.path.basename(self.working_dir))
 
         return v.format(fmt)
+
+    def _parse_datetime(self, datestr):
+        parsed = None
+
+        for fmt, _ in datetime_fmts:
+            try:
+                dt = datetime.strptime(datestr, fmt)
+            except ValueError:
+                pass
+            else:
+                parsed = dt
+                break
+
+        # Convert naive DT object to seconds since UNIX epoch
+        return int((parsed - datetime(1970, 1, 1)) / timedelta(seconds=1))
+
+    def _iter_commits_in_date_range(self, start_date, end_date):
+        start_secs = self._parse_datetime(start_date)
+        end_secs = self._parse_datetime(end_date)
+
+        seen_end = False
+        for commit in self.iter_commits(None):
+            if commit.committed_date <= end_secs:
+                seen_end = True
+
+            if commit.committed_date <= start_secs:
+                break
+
+            yield commit
+
+    def _iter_commits_in_tag_range(self, start_tag, end_tag):
+        tagnames = {t.name: t for t in self.tags}
+        taghashes = {t.commit.hexsha: t for t in self.tags}
+        end_sha = None
+        start_sha = None
+
+        if (start_tag is not None) and (start_tag not in tagnames):
+            raise RuntimeError("tag '%s' not found in repo %s" %
+                               (start_tag, os.path.basename(self.working_dir)))
+
+        if (end_tag is not None) and (end_tag not in tagnames):
+            raise RuntimeError("tag '%s' not found in repo %s" %
+                               (end_tag, os.path.basename(self.working_dir)))
+
+        if end_tag is None:
+            # Use HEAD as end SHA if no end tag is set
+            end_sha = self.head.commit.hexsha
+        else:
+            # Otherwise, grab the commit SHA of the given tag
+            end_sha = tagnames[end_tag].commit.hexsha
+
+        if start_tag is not None:
+            start_sha = tagnames[start_tag].commit.hexsha
+
+        seen_end = False
+        for commit in self.iter_commits(None):
+            if commit.hexsha == end_sha:
+                seen_end = True
+
+            if start_sha is None:
+                # If no start tag is defined, we should stop at the first tag
+                # we see after end commit SHA
+                if (commit.hexsha in taghashes) and (commit.hexsha != end_sha):
+                    break
+
+            elif start_sha == commit.hexsha:
+                # Otherwise, stop at the defined start tag
+                break
+
+            if seen_end:
+                yield commit
+
+    def changelog(self, start_tag=None, end_tag=None, start_date=None, end_date=None):
+        changelog = ChangeLog()
+
+        if None not in [start_date, end_date]:
+            for commit in self._iter_commits_in_date_range(start_date, end_date):
+                changelog.add_commit(commit)
+
+        else:
+            for commit in self._iter_commits_in_tag_range(start_tag, end_tag):
+                changelog.add_commit(commit)
+
+        return changelog

@@ -2,9 +2,9 @@ import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from git_tools.utils import open_git_repo
-from git_tools.git_repo import default_fmt
+from git_tools.git_repo import default_version_fmt
 
-default_fmt_str = ",".join(default_fmt)
+default_fmt_str = ",".join(default_version_fmt)
 
 desc='Print a formatted version string based on git history'
 epilog=('''
