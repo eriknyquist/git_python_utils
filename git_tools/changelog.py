@@ -1,11 +1,26 @@
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from git_tools.utils import open_git_repo
+from git_tools.git_repo import datetime_fmts
+
+desc = 'Print a changelog for a range of commits'
+epilog = ('''
+
+Date/time Format
+----------------
+
+The following formats are accepted by the --start-date and --end-date options:
+
+%s
+''' % '\n'.join([f[1] for f in datetime_fmts]))
 
 
 def main():
-    parser = ArgumentParser(description='Print a changelog for a range of commits')
+    parser = ArgumentParser(description=desc,
+                            formatter_class=RawDescriptionHelpFormatter,
+                            epilog=epilog)
+
     parser.add_argument('-d', '--directory', dest='directory', default='.',
             help="Path to git repo directory")
     parser.add_argument('-s', '--start-tag', dest='start_tag', default=None,
