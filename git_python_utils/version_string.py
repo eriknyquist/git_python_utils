@@ -1,8 +1,8 @@
 import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
-from git_tools.utils import open_git_repo
-from git_tools.git_repo import default_version_fmt
+from git_python_utils.utils import open_git_repo
+from git_python_utils.git_repo import default_version_fmt
 
 default_fmt_str = ",".join(default_version_fmt)
 
@@ -104,22 +104,32 @@ def main():
     parser.add_argument('-f', '--format', dest='fmt', default=default_fmt_str,
             help="Comma-separated sequence of tokens to describe version string "
             "format (see 'Format Tokens' section) (default=%(default)s)")
+    parser.add_argument('-t', '--template', dest='template_file', default=None,
+            help="Path to template file (overrides '-f' option)")
+    parser.add_argument('-o', '--output', dest='output_file', default=None,
+            help="Output to file instead of stdout")
+
     args = parser.parse_args()
 
     r = open_git_repo(args.directory)
     if r is None:
         return -1
 
-    fmt_args = [x.strip() for x in args.fmt.split(",")]
+    if args.template_file is None:
+        fmt_args = [x.strip() for x in args.fmt.split(",")]
+        ver = r.generate_version_string(fmt=fmt_args, dirty_tag=args.dirty_tag,
+                                        literal_char=args.literal_char,
+                                        pipfriendly=args.pipfriendly)
 
-    ver = r.generate_version_string(fmt=fmt_args, dirty_tag=args.dirty_tag,
-                                    literal_char=args.literal_char)
+    else:
+        ver = r.process_template(args.template_file)
 
-    if args.pipfriendly:
-        if ver[0] in ['v', 'V']:
-            ver = ver[1:]
+    if args.output_file is None:
+        print(ver)
+    else:
+        with open(args.output_file, 'w') as fh:
+            fh.write(ver)
 
-    print(ver)
     return 0
 
 if __name__ == "__main__":

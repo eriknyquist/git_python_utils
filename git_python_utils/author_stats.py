@@ -1,7 +1,7 @@
 import sys
 from argparse import ArgumentParser
 
-from git_tools.utils import open_git_repo
+from git_python_utils.utils import open_git_repo
 
 
 def main():

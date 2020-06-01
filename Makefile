@@ -1,4 +1,4 @@
-PKG_DIR     := git_tools
+PKG_DIR     := git_python_utils
 
 PYTHON      := python3
 GENVERSION  := gen_version.py

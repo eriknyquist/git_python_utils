@@ -1,6 +1,6 @@
 import os
 
-from git_tools.git_repo import GitRepo
+from git_python_utils.git_repo import GitRepo
 
 
 def open_git_repo(path):

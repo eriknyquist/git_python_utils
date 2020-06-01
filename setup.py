@@ -3,7 +3,7 @@ import os
 import sys
 from setuptools import setup
 
-package_name = "git_tools"
+package_name = "git_python_utils"
 
 sys.path.insert(0, package_name)
 import version
@@ -19,8 +19,6 @@ with open(REQS, 'r') as fh:
     requirements = fh.readlines()
 
 version_str = version.version.strip()
-if version_str[0] in ['v', 'V']:
-    version_str = version_str[1:]
 
 setup(
     name=package_name,
@@ -28,11 +26,11 @@ setup(
     description=('A collection of command-line utilities for interacting with '
                  'git repositories'),
     long_description=long_description,
-    url='http://github.com/eriknyquist/git_tools',
+    url='http://github.com/eriknyquist/git_python_utils',
     author='Erik Nyquist',
     author_email='eknyquist@gmail.com',
     license='Apache 2.0',
-    packages=['git_tools'],
+    packages=['git_python_utils'],
     install_requires=requirements,
     include_package_data=True,
     entry_points={

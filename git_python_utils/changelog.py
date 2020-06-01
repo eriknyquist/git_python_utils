@@ -1,8 +1,8 @@
 import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
-from git_tools.utils import open_git_repo
-from git_tools.git_repo import datetime_fmts
+from git_python_utils.utils import open_git_repo
+from git_python_utils.git_repo import datetime_fmts
 
 desc = 'Print a changelog for a range of commits'
 epilog = ('''

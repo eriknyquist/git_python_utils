@@ -1,5 +1,5 @@
 import sys
-from git_tools.git_repo import GitRepo
+from git_python_utils.git_repo import GitRepo
 
 def main():
     if len(sys.argv) != 2:

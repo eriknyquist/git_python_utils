@@ -1,15 +1,16 @@
 import datetime
 import time
+import re
 import os
 from datetime import datetime, timedelta
 
 from git import Repo
 from git.exc import GitCommandError
 
-from git_tools.author import RepoAuthor
+from git_python_utils.author import RepoAuthor
 
 
-default_version_fmt = [".", "tag", "commits", "-", "dirty", "incsha"]
+default_version_fmt = [".", "tag", "nsince", "-", "dirty", "incsha"]
 
 commit_sha_lens = [8, 40]
 
@@ -75,6 +76,21 @@ class VersionInfo(object):
             ret += field
 
         return ret
+
+    def _on_template_match(self, match):
+        kw = match.group()[1:-1]
+        if kw not in self._fmt_args:
+            # Unknown keyword, no change
+            return match.group()
+
+        return self._fmt_args[kw](self)
+
+    def template(self, filename):
+        with open(filename, 'r') as fh:
+            template_data = fh.read()
+
+        rgx = re.compile(r'{[a-z]+}')
+        return rgx.sub(self._on_template_match, template_data)
 
 
 class ChangeLogCommitInfo(object):
@@ -291,20 +307,32 @@ class GitRepo(Repo):
 
         return None, commits_since
 
-    def generate_version_string(self, fmt=default_version_fmt, dirty_tag="dirty",
-                                literal_char="%"):
-        VersionInfo.dirty_tag = dirty_tag
-        VersionInfo.literal_char = literal_char
-
+    def _latest_version_info(self):
         tagname, commits_since = self._latest_tag_info()
         if tagname is None:
             tagname = "v0.0.1"
 
-        v = VersionInfo(self, tagname, self.active_branch.name, commits_since,
-                        self.is_dirty(), self.head.commit.hexsha[:8],
-                        os.path.basename(self.working_dir))
+        return VersionInfo(self, tagname, self.active_branch.name, commits_since,
+                           self.is_dirty(), self.head.commit.hexsha[:8],
+                           os.path.basename(self.working_dir))
 
-        return v.format(fmt)
+    def generate_version_string(self, fmt=default_version_fmt, dirty_tag="dirty",
+                                literal_char="%", pipfriendly=False):
+        VersionInfo.dirty_tag = dirty_tag
+        VersionInfo.literal_char = literal_char
+
+        v = self._latest_version_info()
+        vstr = v.format(fmt)
+
+        if pipfriendly:
+            if vstr[0] in ['v', 'V']:
+                vstr = vstr[1:]
+
+        return vstr
+
+    def process_template(self, filename):
+        v = self._latest_version_info()
+        return v.template(filename)
 
     def changelog(self, start_tag=None, end_tag=None, start_date=None,
                   end_date=None, start_sha=None, end_sha=None):
